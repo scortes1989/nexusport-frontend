@@ -1,0 +1,44 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  --font-display: 'Outfit', sans-serif;
+
+  /* Custom Color Palette: High-performance Sportswear Orange/Dark theme */
+  --color-brand-50: #fff7ed;
+  --color-brand-100: #ffedd5;
+  --color-brand-500: #f97316;
+  --color-brand-600: #ea580c;
+  --color-brand-700: #c2410c;
+  --color-brand-900: #7c2d12;
+  
+  --color-accent-400: #fb923c;
+  --color-accent-500: #f97316;
+  
+  --color-dark-800: #0f172a;
+  --color-dark-900: #020617;
+}
+
+/* Custom Base Styles */
+html, body {
+  @apply bg-slate-950 text-slate-100 font-sans selection:bg-orange-600 selection:text-white antialiased scroll-smooth;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  @apply font-display font-semibold tracking-tight;
+}
+
+/* Micro-animations */
+.hover-lift {
+  @apply transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-lg hover:shadow-orange-500/10;
+}
+
+.glassmorphism {
+  @apply bg-slate-900/60 backdrop-blur-xl border border-slate-800/80;
+}
+
+.gradient-text {
+  @apply bg-gradient-to-r from-orange-400 via-pink-500 to-rose-500 bg-clip-text text-transparent;
+}
