@@ -181,6 +181,34 @@ export function useProducts() {
     }
   };
 
+  const fetchProductById = async (id: string): Promise<Product | undefined> => {
+    try {
+      const res = await $fetch<{ data: any }>(`http://127.0.0.1:8000/api/products/${id}`);
+      if (res && res.data) {
+        const p = res.data;
+        return {
+          id: String(p.id),
+          name: p.name,
+          description: p.description,
+          longDescription: p.longDescription,
+          price: Number(p.price),
+          category: p.category,
+          gradient: p.gradient,
+          rating: Number(p.rating),
+          reviewsCount: Number(p.reviewsCount),
+          specs: p.specs,
+          featured: Boolean(p.featured),
+          stock: Number(p.stock),
+          imageUrl: p.imageUrl || ''
+        };
+      }
+    } catch (err) {
+      console.warn(`Could not load product ${id} from backend API, using local fallbacks.`, err);
+    }
+    // Fallback:
+    return mockProducts.find(p => p.id === id);
+  };
+
   const getFeaturedProducts = (): Product[] => {
     return productsState.value.filter(p => p.featured);
   };
@@ -194,6 +222,7 @@ export function useProducts() {
     getProductById,
     getCategories,
     loadProducts,
+    fetchProductById,
     getFeaturedProducts,
     getProductsByCategory
   };

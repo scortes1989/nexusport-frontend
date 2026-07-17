@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref, computed, onMounted } from 'vue';
 import { useProducts } from '~/composables/useProducts';
 import { useCart } from '~/composables/useCart';
 
@@ -12,11 +13,15 @@ useSeoMeta({
   twitterCard: 'summary_large_image',
 });
 
-const { getFeaturedProducts, getCategories } = useProducts();
+const { loadProducts, getFeaturedProducts, getCategories } = useProducts();
 const { addToCart } = useCart();
 
-const featuredProducts = getFeaturedProducts();
-const categories = getCategories();
+const featuredProducts = computed(() => getFeaturedProducts());
+const categories = computed(() => getCategories());
+
+onMounted(() => {
+  loadProducts();
+});
 
 // Notification Toast
 const toastMessage = ref('');
@@ -31,6 +36,7 @@ const handleAddToCart = (product: any) => {
   }, 3000);
 };
 </script>
+
 
 <template>
   <div class="space-y-20 pb-20 relative overflow-hidden">

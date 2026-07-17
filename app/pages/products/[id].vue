@@ -1,25 +1,16 @@
 <script setup lang="ts">
+import { ref, computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
-import { useProducts } from '~/composables/useProducts';
+import { useProducts, type Product } from '~/composables/useProducts';
 import { useCart } from '~/composables/useCart';
 
 const route = useRoute();
-const { getProductById, getProductsByCategory } = useProducts();
+const { fetchProductById, getProductsByCategory } = useProducts();
 const { addToCart } = useCart();
 
 const productId = route.params.id as string;
-const product = getProductById(productId);
-
-if (!product) {
-  throw createError({ statusCode: 404, statusMessage: 'Producto no encontrado' });
-}
-
-useSeoMeta({
-  title: `${product.name} - NexusSport`,
-  description: product.description,
-  ogTitle: `${product.name} - Compra en NexusSport`,
-  ogDescription: product.description,
-});
+const product = ref<Product | null>(null);
+const loading = ref(true);
 
 const quantity = ref(1);
 const selectedSize = ref('');
@@ -28,25 +19,42 @@ const showToast = ref(false);
 
 // Size list options based on category
 const sizes = computed(() => {
-  if (!product) return [];
-  if (product.category === 'Calzado') {
+  if (!product.value) return [];
+  if (product.value.category === 'Calzado') {
     return ['38', '39', '40', '41', '42', '43', '44'];
   }
-  if (product.category === 'Accesorios') {
+  if (product.value.category === 'Accesorios') {
     return ['Única'];
   }
   return ['S', 'M', 'L', 'XL'];
 });
 
-// Set default size
-if (sizes.value.length > 0) {
-  selectedSize.value = sizes.value[0];
-}
+onMounted(async () => {
+  const p = await fetchProductById(productId);
+  if (!p) {
+    throw createError({ statusCode: 404, statusMessage: 'Producto no encontrado' });
+  }
+  product.value = p;
+  
+  // Set default size
+  if (sizes.value.length > 0) {
+    selectedSize.value = sizes.value[0];
+  }
+
+  useSeoMeta({
+    title: `${p.name} - NexusSport`,
+    description: p.description,
+    ogTitle: `${p.name} - Compra en NexusSport`,
+    ogDescription: p.description,
+  });
+
+  loading.value = false;
+});
 
 const handleAddToCart = () => {
-  if (!product) return;
-  addToCart(product, quantity.value);
-  toastMessage.value = `¡${quantity.value}x ${product.name} (Talla: ${selectedSize.value}) agregado al carrito!`;
+  if (!product.value) return;
+  addToCart(product.value, quantity.value);
+  toastMessage.value = `¡${quantity.value}x ${product.value.name} (Talla: ${selectedSize.value}) agregado al carrito!`;
   showToast.value = true;
   setTimeout(() => {
     showToast.value = false;
@@ -54,7 +62,7 @@ const handleAddToCart = () => {
 };
 
 const incrementQty = () => {
-  if (product && quantity.value < product.stock) {
+  if (product.value && quantity.value < product.value.stock) {
     quantity.value++;
   }
 };
@@ -66,9 +74,9 @@ const decrementQty = () => {
 };
 
 const relatedProducts = computed(() => {
-  if (!product) return [];
-  return getProductsByCategory(product.category)
-    .filter(p => p.id !== product.id)
+  if (!product.value) return [];
+  return getProductsByCategory(product.value.category)
+    .filter(p => p.id !== product.value?.id)
     .slice(0, 3);
 });
 </script>

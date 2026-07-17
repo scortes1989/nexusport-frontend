@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useProducts } from '~/composables/useProducts';
 import { useCart } from '~/composables/useCart';
@@ -11,11 +11,15 @@ useSeoMeta({
 
 const route = useRoute();
 const router = useRouter();
-const { getProducts, getCategories } = useProducts();
+const { loadProducts, getProducts, getCategories } = useProducts();
 const { addToCart } = useCart();
 
-const allProducts = getProducts();
-const categories = getCategories();
+const allProducts = computed(() => getProducts());
+const categories = computed(() => getCategories());
+
+onMounted(() => {
+  loadProducts();
+});
 
 // Filtering and sorting states
 const search = ref('');
@@ -38,11 +42,12 @@ const setCategory = (cat: string) => {
 };
 
 const filteredProducts = computed(() => {
-  let result = [...allProducts];
+  let result = [...allProducts.value];
 
   if (activeCategory.value) {
     result = result.filter(p => p.category === activeCategory.value);
   }
+
 
   if (search.value.trim()) {
     const query = search.value.toLowerCase().trim();

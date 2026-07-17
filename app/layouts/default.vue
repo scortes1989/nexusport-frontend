@@ -5,7 +5,6 @@ import { useProducts } from '~/composables/useProducts';
 
 const { cartTotalCount } = useCart();
 
-const { loadProducts } = useProducts();
 const route = useRoute();
 
 // Simple navigation links
@@ -13,11 +12,8 @@ const navLinks = [
   { name: 'Inicio', path: '/' },
   { name: 'Catálogo', path: '/categories' },
 ];
-
-onMounted(() => {
-  loadProducts();
-});
 </script>
+
 
 
 
