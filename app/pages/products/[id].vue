@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useProducts, type Product } from '~/composables/useProducts';
 import { useCart } from '~/composables/useCart';
@@ -17,16 +17,32 @@ const selectedSize = ref('');
 const toastMessage = ref('');
 const showToast = ref(false);
 
-// Size list options based on category
+// Size list options based on category (populated from product's actual sizes array)
 const sizes = computed(() => {
   if (!product.value) return [];
-  if (product.value.category === 'Calzado') {
-    return ['38', '39', '40', '41', '42', '43', '44'];
+  return product.value.sizes?.map(s => s.size) || [];
+});
+
+const isSizeOutOfStock = (sizeName: string) => {
+  if (!product.value) return true;
+  const sizeObj = product.value.sizes?.find(s => s.size === sizeName);
+  return sizeObj ? sizeObj.stock === 0 : true;
+};
+
+const selectedSizeStock = computed(() => {
+  if (!product.value || !selectedSize.value) return 0;
+  const sizeObj = product.value.sizes?.find(s => s.size === selectedSize.value);
+  return sizeObj ? sizeObj.stock : product.value.stock;
+});
+
+watch(selectedSize, (newSize) => {
+  if (product.value) {
+    const sizeObj = product.value.sizes?.find(s => s.size === newSize);
+    const maxStock = sizeObj ? sizeObj.stock : product.value.stock;
+    if (quantity.value > maxStock) {
+      quantity.value = Math.max(1, maxStock);
+    }
   }
-  if (product.value.category === 'Accesorios') {
-    return ['Única'];
-  }
-  return ['S', 'M', 'L', 'XL'];
 });
 
 onMounted(async () => {
@@ -36,8 +52,11 @@ onMounted(async () => {
   }
   product.value = p;
   
-  // Set default size
-  if (sizes.value.length > 0) {
+  // Set default size (first one in stock)
+  const defaultSizeObj = p.sizes?.find(s => s.stock > 0);
+  if (defaultSizeObj) {
+    selectedSize.value = defaultSizeObj.size;
+  } else if (sizes.value.length > 0) {
     selectedSize.value = sizes.value[0];
   }
 
@@ -53,7 +72,7 @@ onMounted(async () => {
 
 const handleAddToCart = () => {
   if (!product.value) return;
-  addToCart(product.value, quantity.value);
+  addToCart(product.value, selectedSize.value, quantity.value);
   toastMessage.value = `¡${quantity.value}x ${product.value.name} (Talla: ${selectedSize.value}) agregado al carrito!`;
   showToast.value = true;
   setTimeout(() => {
@@ -62,7 +81,7 @@ const handleAddToCart = () => {
 };
 
 const incrementQty = () => {
-  if (product.value && quantity.value < product.value.stock) {
+  if (product.value && quantity.value < selectedSizeStock.value) {
     quantity.value++;
   }
 };
@@ -175,11 +194,16 @@ const relatedProducts = computed(() => {
             <button
               v-for="size in sizes"
               :key="size"
+              :disabled="isSizeOutOfStock(size)"
               @click="selectedSize = size"
-              class="w-12 h-12 flex items-center justify-center text-xs font-semibold border rounded-xl transition-all cursor-pointer"
-              :class="selectedSize === size
-                ? 'bg-orange-600 border-transparent text-white shadow-md shadow-orange-500/20'
-                : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-600'"
+              class="w-12 h-12 flex items-center justify-center text-xs font-semibold border rounded-xl transition-all"
+              :class="[
+                isSizeOutOfStock(size)
+                  ? 'bg-slate-950 border-slate-900 text-slate-600 opacity-30 cursor-not-allowed line-through'
+                  : (selectedSize === size
+                      ? 'bg-orange-600 border-transparent text-white shadow-md shadow-orange-500/20 cursor-pointer'
+                      : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-600 cursor-pointer')
+              ]"
             >
               {{ size }}
             </button>
@@ -204,7 +228,7 @@ const relatedProducts = computed(() => {
                 <button
                   @click="incrementQty"
                   class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
-                  :disabled="quantity >= product.stock"
+                  :disabled="quantity >= selectedSizeStock"
                 >
                   +
                 </button>
@@ -213,13 +237,17 @@ const relatedProducts = computed(() => {
 
             <!-- Stock Indicator -->
             <div class="flex flex-col justify-end pt-4">
-              <span v-if="product.stock <= 5" class="text-xs font-semibold text-red-500 flex items-center space-x-1 animate-pulse">
+              <span v-if="selectedSizeStock === 0" class="text-xs font-semibold text-rose-500 flex items-center space-x-1">
                 <span>⚠</span>
-                <span>¡Poco stock! ({{ product.stock }} restantes)</span>
+                <span>Agotado en esta talla</span>
+              </span>
+              <span v-else-if="selectedSizeStock <= 5" class="text-xs font-semibold text-red-500 flex items-center space-x-1 animate-pulse">
+                <span>⚠</span>
+                <span>¡Poco stock! ({{ selectedSizeStock }} restantes)</span>
               </span>
               <span v-else class="text-xs text-emerald-400 flex items-center space-x-1">
                 <span class="w-2 h-2 rounded-full bg-emerald-400 inline-block mr-1"></span>
-                <span>En Stock ({{ product.stock }} unidades)</span>
+                <span>En Stock ({{ selectedSizeStock }} unidades)</span>
               </span>
             </div>
           </div>
@@ -227,8 +255,10 @@ const relatedProducts = computed(() => {
           <!-- Add to Cart CTA -->
           <button
             id="btn-add-to-cart-detail"
+            :disabled="selectedSizeStock === 0"
             @click="handleAddToCart"
-            class="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 text-white font-semibold rounded-2xl py-4 shadow-lg shadow-orange-500/20 hover:shadow-orange-500/35 hover-lift transition-all flex items-center justify-center space-x-2 text-sm cursor-pointer"
+            class="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 text-white font-semibold rounded-2xl py-4 shadow-lg shadow-orange-500/20 hover:shadow-orange-500/35 hover-lift transition-all flex items-center justify-center space-x-2 text-sm"
+            :class="[selectedSizeStock === 0 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer']"
           >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
               <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007ZM8.625 10.5a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm7.5 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />

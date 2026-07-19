@@ -1,13 +1,14 @@
 import { ref, computed, watch, onMounted } from 'vue';
 import { type Product } from './useProducts';
 
+// CartItem tracks product, quantity AND size
 export interface CartItem {
   product: Product;
   quantity: number;
+  size: string;
 }
 
 export function useCart() {
-  // Use Nuxt's shared state so that it is reactive across all pages and components
   const cart = useState<CartItem[]>('cart_state', () => []);
   const initialized = useState<boolean>('cart_initialized', () => false);
 
@@ -37,23 +38,52 @@ export function useCart() {
     );
   }
 
-  const addToCart = (product: Product, quantity = 1) => {
-    const existing = cart.value.find(item => item.product.id === product.id);
+  const addToCart = (product: Product, size?: string, quantity = 1) => {
+    // If no size is specified (e.g. quick-add from catalog), default to first size with stock > 0
+    let selectedSize = size;
+    if (!selectedSize) {
+      const availableSize = product.sizes?.find(s => s.stock > 0);
+      selectedSize = availableSize ? availableSize.size : (product.sizes?.[0]?.size || 'Única');
+    }
+
+    // Find the stock limit for this specific size
+    const sizeObj = product.sizes?.find(s => s.size === selectedSize);
+    const maxStock = sizeObj ? sizeObj.stock : product.stock;
+
+    if (maxStock <= 0) {
+      console.warn("Product is out of stock in selected size", selectedSize);
+      return;
+    }
+
+    const existing = cart.value.find(
+      item => item.product.id === product.id && item.size === selectedSize
+    );
+
     if (existing) {
-      existing.quantity = Math.min(existing.quantity + quantity, product.stock);
+      existing.quantity = Math.min(existing.quantity + quantity, maxStock);
     } else {
-      cart.value.push({ product, quantity: Math.min(quantity, product.stock) });
+      cart.value.push({
+        product,
+        size: selectedSize,
+        quantity: Math.min(quantity, maxStock)
+      });
     }
   };
 
-  const removeFromCart = (productId: string) => {
-    cart.value = cart.value.filter(item => item.product.id !== productId);
+  const removeFromCart = (productId: string, size: string) => {
+    cart.value = cart.value.filter(
+      item => !(item.product.id === productId && item.size === size)
+    );
   };
 
-  const updateQuantity = (productId: string, quantity: number) => {
-    const item = cart.value.find(item => item.product.id === productId);
+  const updateQuantity = (productId: string, size: string, quantity: number) => {
+    const item = cart.value.find(
+      item => item.product.id === productId && item.size === size
+    );
     if (item) {
-      item.quantity = Math.max(1, Math.min(quantity, item.product.stock));
+      const sizeObj = item.product.sizes?.find(s => s.size === size);
+      const maxStock = sizeObj ? sizeObj.stock : item.product.stock;
+      item.quantity = Math.max(1, Math.min(quantity, maxStock));
     }
   };
 

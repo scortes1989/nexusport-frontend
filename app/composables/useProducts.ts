@@ -11,6 +11,7 @@ export interface Product {
   specs: { label: string; value: string }[];
   featured: boolean;
   stock: number;
+  sizes?: { size: string; stock: number }[];
   imageUrl: string;
 }
 
@@ -33,6 +34,12 @@ const mockProducts: Product[] = [
     ],
     featured: true,
     stock: 15,
+    sizes: [
+      { size: "S", stock: 5 },
+      { size: "M", stock: 8 },
+      { size: "L", stock: 0 },
+      { size: "XL", stock: 2 }
+    ],
     imageUrl: "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?auto=format&fit=crop&w=600&q=80"
   },
   {
@@ -53,6 +60,14 @@ const mockProducts: Product[] = [
     ],
     featured: true,
     stock: 22,
+    sizes: [
+      { size: "39", stock: 3 },
+      { size: "40", stock: 0 },
+      { size: "41", stock: 8 },
+      { size: "42", stock: 6 },
+      { size: "43", stock: 5 },
+      { size: "44", stock: 0 }
+    ],
     imageUrl: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=600&q=80"
   },
   {
@@ -73,6 +88,11 @@ const mockProducts: Product[] = [
     ],
     featured: true,
     stock: 8,
+    sizes: [
+      { size: "S", stock: 3 },
+      { size: "M", stock: 5 },
+      { size: "L", stock: 0 }
+    ],
     imageUrl: "https://images.unsplash.com/photo-1539185441755-769473a23570?auto=format&fit=crop&w=600&q=80"
   },
   {
@@ -93,6 +113,11 @@ const mockProducts: Product[] = [
     ],
     featured: false,
     stock: 30,
+    sizes: [
+      { size: "S", stock: 10 },
+      { size: "M", stock: 12 },
+      { size: "L", stock: 8 }
+    ],
     imageUrl: "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=600&q=80"
   },
   {
@@ -113,6 +138,9 @@ const mockProducts: Product[] = [
     ],
     featured: false,
     stock: 5,
+    sizes: [
+      { size: "Única", stock: 5 }
+    ],
     imageUrl: "https://images.unsplash.com/photo-1551854838-212c50b4c184?auto=format&fit=crop&w=600&q=80"
   },
   {
@@ -133,6 +161,9 @@ const mockProducts: Product[] = [
     ],
     featured: false,
     stock: 45,
+    sizes: [
+      { size: "Única", stock: 45 }
+    ],
     imageUrl: "https://images.unsplash.com/photo-1608231387042-66d1773070a5?auto=format&fit=crop&w=600&q=80"
   }
 ];
@@ -170,6 +201,7 @@ export function useProducts() {
           specs: p.specs,
           featured: Boolean(p.featured),
           stock: Number(p.stock),
+          sizes: p.sizes,
           imageUrl: p.imageUrl || ''
         }));
         
@@ -199,6 +231,7 @@ export function useProducts() {
           specs: p.specs,
           featured: Boolean(p.featured),
           stock: Number(p.stock),
+          sizes: p.sizes,
           imageUrl: p.imageUrl || ''
         };
       }
