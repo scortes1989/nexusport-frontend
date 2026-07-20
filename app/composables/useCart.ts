@@ -1,44 +1,60 @@
-import { ref, computed, watch, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { type Product } from './useProducts';
 
-// CartItem tracks product, quantity AND size
+// CartItem tracks product, quantity, size string AND productSizeId relation
 export interface CartItem {
   product: Product;
   quantity: number;
   size: string;
+  productSizeId: number;
 }
 
 export function useCart() {
+  // Use Nuxt's shared state so that it is reactive across all pages and components
   const cart = useState<CartItem[]>('cart_state', () => []);
   const initialized = useState<boolean>('cart_initialized', () => false);
 
-  // Load from localStorage only on client side after mounting
+  // Initialize and persist user session ID in cookie
+  const sessionId = useCookie<string>('nexusport_session_id', {
+    maxAge: 60 * 60 * 24 * 7, // 1 week
+    path: '/'
+  });
+
+  // Ensure unique session ID exists
+  if (!sessionId.value) {
+    sessionId.value = crypto.randomUUID();
+  }
+
+  // Get headers with session ID
+  const getHeaders = () => {
+    return {
+      'X-Session-ID': sessionId.value || ''
+    };
+  };
+
+  // Sync state by querying Laravel API
+  const fetchCart = async () => {
+    try {
+      const res = await $fetch<{ cart: CartItem[] }>('http://127.0.0.1:8000/api/cart', {
+        headers: getHeaders()
+      });
+      if (res && Array.isArray(res.cart)) {
+        cart.value = res.cart;
+      }
+    } catch (e) {
+      console.warn("Error fetching cart from Laravel API", e);
+    }
+  };
+
+  // Load from session API after mounting on client side
   onMounted(() => {
     if (!initialized.value) {
-      const stored = localStorage.getItem('e_commerce_cart');
-      if (stored) {
-        try {
-          cart.value = JSON.parse(stored);
-        } catch (e) {
-          console.error("Error reading cart from localStorage", e);
-        }
-      }
+      fetchCart();
       initialized.value = true;
     }
   });
 
-  // Watch for changes in cart and save to localStorage
-  if (process.client) {
-    watch(
-      cart,
-      (newCart) => {
-        localStorage.setItem('e_commerce_cart', JSON.stringify(newCart));
-      },
-      { deep: true }
-    );
-  }
-
-  const addToCart = (product: Product, size?: string, quantity = 1) => {
+  const addToCart = async (product: Product, size?: string, quantity = 1) => {
     // If no size is specified (e.g. quick-add from catalog), default to first size with stock > 0
     let selectedSize = size;
     if (!selectedSize) {
@@ -46,44 +62,70 @@ export function useCart() {
       selectedSize = availableSize ? availableSize.size : (product.sizes?.[0]?.size || 'Única');
     }
 
-    // Find the stock limit for this specific size
+    // Find the stock limit and productSizeId for this specific size
     const sizeObj = product.sizes?.find(s => s.size === selectedSize);
     const maxStock = sizeObj ? sizeObj.stock : product.stock;
+    const productSizeId = sizeObj ? sizeObj.id : null;
+
+    if (!productSizeId) {
+      console.warn("No valid size ID found for selected size", selectedSize);
+      return;
+    }
 
     if (maxStock <= 0) {
       console.warn("Product is out of stock in selected size", selectedSize);
       return;
     }
 
-    const existing = cart.value.find(
-      item => item.product.id === product.id && item.size === selectedSize
-    );
-
-    if (existing) {
-      existing.quantity = Math.min(existing.quantity + quantity, maxStock);
-    } else {
-      cart.value.push({
-        product,
-        size: selectedSize,
-        quantity: Math.min(quantity, maxStock)
+    try {
+      await $fetch('http://127.0.0.1:8000/api/cart', {
+        method: 'POST',
+        headers: getHeaders(),
+        body: {
+          product_id: Number(product.id),
+          product_size_id: Number(productSizeId),
+          quantity: Math.min(quantity, maxStock)
+        }
       });
+      // Refresh the local state
+      await fetchCart();
+    } catch (e) {
+      console.error("Error adding product to Laravel cart API", e);
     }
   };
 
-  const removeFromCart = (productId: string, size: string) => {
-    cart.value = cart.value.filter(
-      item => !(item.product.id === productId && item.size === size)
-    );
+  const removeFromCart = async (productId: string, productSizeId: number) => {
+    try {
+      await $fetch('http://127.0.0.1:8000/api/cart', {
+        method: 'DELETE',
+        headers: getHeaders(),
+        body: {
+          product_id: Number(productId),
+          product_size_id: Number(productSizeId)
+        }
+      });
+      // Refresh local state
+      await fetchCart();
+    } catch (e) {
+      console.error("Error removing product from Laravel cart API", e);
+    }
   };
 
-  const updateQuantity = (productId: string, size: string, quantity: number) => {
-    const item = cart.value.find(
-      item => item.product.id === productId && item.size === size
-    );
-    if (item) {
-      const sizeObj = item.product.sizes?.find(s => s.size === size);
-      const maxStock = sizeObj ? sizeObj.stock : item.product.stock;
-      item.quantity = Math.max(1, Math.min(quantity, maxStock));
+  const updateQuantity = async (productId: string, productSizeId: number, quantity: number) => {
+    try {
+      await $fetch('http://127.0.0.1:8000/api/cart', {
+        method: 'PUT',
+        headers: getHeaders(),
+        body: {
+          product_id: Number(productId),
+          product_size_id: Number(productSizeId),
+          quantity: quantity
+        }
+      });
+      // Refresh local state
+      await fetchCart();
+    } catch (e) {
+      console.error("Error updating quantity in Laravel cart API", e);
     }
   };
 
@@ -101,6 +143,7 @@ export function useCart() {
 
   return {
     cart,
+    fetchCart,
     addToCart,
     removeFromCart,
     updateQuantity,

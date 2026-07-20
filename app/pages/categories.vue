@@ -73,7 +73,7 @@ const toastMessage = ref('');
 const showToast = ref(false);
 
 const handleAddToCart = (product: any) => {
-  addToCart(product, 1);
+  addToCart(product);
   toastMessage.value = `¡${product.name} agregado al carrito!`;
   showToast.value = true;
   setTimeout(() => {

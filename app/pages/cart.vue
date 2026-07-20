@@ -88,7 +88,7 @@ const handleCheckout = () => {
         <div class="lg:col-span-8 space-y-4">
           <div
             v-for="item in cart"
-            :key="item.product.id + '-' + item.size"
+            :key="item.product.id + '-' + item.productSizeId"
             class="glassmorphism p-5 rounded-2xl border border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-6"
           >
             <!-- Product Thumbnail & Details -->
@@ -144,7 +144,7 @@ const handleCheckout = () => {
               <!-- Qty Selector -->
               <div class="flex items-center border border-slate-800 bg-slate-950 rounded-xl p-0.5">
                 <button
-                  @click="updateQuantity(item.product.id, item.size, item.quantity - 1)"
+                  @click="updateQuantity(item.product.id, item.productSizeId, item.quantity - 1)"
                   class="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white rounded-lg hover:bg-slate-900 transition-colors"
                   :disabled="item.quantity <= 1"
                 >
@@ -152,9 +152,9 @@ const handleCheckout = () => {
                 </button>
                 <span class="w-10 text-center text-xs font-semibold text-white">{{ item.quantity }}</span>
                 <button
-                  @click="updateQuantity(item.product.id, item.size, item.quantity + 1)"
+                  @click="updateQuantity(item.product.id, item.productSizeId, item.quantity + 1)"
                   class="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white rounded-lg hover:bg-slate-900 transition-colors"
-                  :disabled="item.quantity >= (item.product.sizes?.find(s => s.size === item.size)?.stock ?? item.product.stock)"
+                  :disabled="item.quantity >= (item.product.sizes?.find(s => s.id === item.productSizeId)?.stock ?? item.product.stock)"
                 >
                   +
                 </button>
@@ -167,7 +167,7 @@ const handleCheckout = () => {
 
               <!-- Delete button -->
               <button
-                @click="removeFromCart(item.product.id, item.size)"
+                @click="removeFromCart(item.product.id, item.productSizeId)"
                 class="text-slate-500 hover:text-red-400 p-2 transition-colors hover-lift cursor-pointer"
                 title="Eliminar producto"
               >

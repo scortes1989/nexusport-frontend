@@ -9,6 +9,14 @@ export default defineNuxtConfig({
     plugins: [
       tailwindcss()
     ]
+  },
+  app: {
+    head: {
+      link: [
+        { rel: 'icon', type: 'image/png', href: '/favicon.png' },
+        { rel: 'shortcut icon', href: '/favicon.ico' }
+      ]
+    }
   }
 })
 

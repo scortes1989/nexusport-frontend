@@ -25,9 +25,7 @@ const navLinks = [
       <div class="max-w-7xl mx-auto flex items-center justify-between">
         <!-- Logo -->
         <NuxtLink to="/" class="flex items-center space-x-2 group">
-          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-orange-600 to-red-500 flex items-center justify-center font-display font-bold text-lg text-white shadow-lg shadow-orange-500/20 group-hover:scale-105 transition-transform duration-300">
-            N
-          </div>
+          <img src="/logo.png" alt="NexusSport Logo" class="w-10 h-10 rounded-xl object-cover shadow-lg shadow-orange-500/20 group-hover:scale-105 transition-transform duration-300" />
           <span class="font-display font-bold text-xl tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
             NEXUS<span class="text-orange-500">SPORT</span>
           </span>
@@ -75,9 +73,7 @@ const navLinks = [
         <!-- Brand / About -->
         <div class="space-y-4">
           <div class="flex items-center space-x-2">
-            <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-orange-600 to-red-500 flex items-center justify-center font-display font-bold text-white shadow-md">
-              N
-            </div>
+            <img src="/logo.png" alt="NexusSport Logo" class="w-8 h-8 rounded-lg object-cover shadow-md" />
             <span class="font-display font-bold text-lg text-white">
               NEXUS<span class="text-orange-500">SPORT</span>
             </span>
