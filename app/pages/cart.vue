@@ -17,6 +17,19 @@ interface Commune {
 
 const communes = ref<Commune[]>([]);
 
+interface PaymentMethod {
+  id: number;
+  name: string;
+  code: string;
+  logo: string;
+}
+
+const paymentMethods = ref<PaymentMethod[]>([]);
+const selectedPaymentMethodId = ref<number | string>('');
+const orderResult = ref<any>(null);
+
+const sessionId = useCookie<string>('nexusport_session_id');
+
 // Fetch Chilean communes from Laravel API
 const fetchCommunes = async () => {
   try {
@@ -27,8 +40,23 @@ const fetchCommunes = async () => {
   }
 };
 
+// Fetch active payment methods from Laravel API
+const fetchPaymentMethods = async () => {
+  try {
+    const res = await $fetch<{ data: PaymentMethod[] }>('http://127.0.0.1:8000/api/payment-methods');
+    paymentMethods.value = res.data || [];
+    // Default to first active payment method if available
+    if (paymentMethods.value.length > 0) {
+      selectedPaymentMethodId.value = paymentMethods.value[0].id;
+    }
+  } catch (e) {
+    console.error("Error loading payment methods from Laravel API", e);
+  }
+};
+
 onMounted(() => {
   fetchCommunes();
+  fetchPaymentMethods();
 });
 
 // Checkout Simulation State
@@ -60,17 +88,43 @@ const checkoutLoading = ref(false);
 const orderPlaced = ref(false);
 const orderId = ref('');
 
-const handleCheckout = () => {
+const handleCheckout = async () => {
   if (cart.value.length === 0) return;
+  if (!selectedPaymentMethodId.value) {
+    alert("Por favor selecciona un medio de pago.");
+    return;
+  }
   
   checkoutLoading.value = true;
   
-  setTimeout(() => {
+  try {
+    const res = await $fetch<{ data: any }>('http://127.0.0.1:8000/api/checkout', {
+      method: 'POST',
+      headers: {
+        'X-Session-ID': sessionId.value || ''
+      },
+      body: {
+        name: checkoutForm.value.name,
+        email: checkoutForm.value.email,
+        address: checkoutForm.value.address,
+        commune_id: Number(checkoutForm.value.communeId),
+        payment_method_id: Number(selectedPaymentMethodId.value)
+      }
+    });
+
+    if (res && res.data) {
+      orderResult.value = res.data;
+      orderId.value = res.data.id;
+      orderPlaced.value = true;
+      clearCart();
+    }
+  } catch (e: any) {
+    console.error("Error during checkout API submission", e);
+    const msg = e.data?.message || "Ocurrió un error al procesar el pago.";
+    alert(msg);
+  } finally {
     checkoutLoading.value = false;
-    orderPlaced.value = true;
-    orderId.value = 'NXS-' + Math.floor(100000 + Math.random() * 900000);
-    clearCart();
-  }, 2000);
+  }
 };
 </script>
 
@@ -88,10 +142,13 @@ const handleCheckout = () => {
         Muchas gracias por tu compra. Tu pedido ha sido procesado de manera exitosa y está en preparación para ser despachado.
       </p>
       
-      <div class="bg-slate-950 border border-slate-900 rounded-2xl p-5 text-left space-y-2">
-        <div class="flex justify-between text-xs"><span class="text-slate-400">ID del Pedido:</span> <span class="font-semibold text-white">{{ orderId }}</span></div>
-        <div class="flex justify-between text-xs"><span class="text-slate-400">Estado:</span> <span class="font-semibold text-emerald-400">Preparando envío</span></div>
-        <div class="flex justify-between text-xs"><span class="text-slate-400">Tiempo de Entrega:</span> <span class="font-semibold text-white">2 - 5 días hábiles</span></div>
+      <div v-if="orderResult" class="bg-slate-950 border border-slate-900 rounded-2xl p-5 text-left space-y-2.5 text-xs text-slate-300">
+        <div class="flex justify-between border-b border-slate-900 pb-1.5"><span class="text-slate-400">ID del Pedido:</span> <span class="font-semibold text-white">#{{ orderId }}</span></div>
+        <div class="flex justify-between border-b border-slate-900 pb-1.5"><span class="text-slate-400">Destinatario:</span> <span class="font-semibold text-white">{{ orderResult.customerName }}</span></div>
+        <div class="flex justify-between border-b border-slate-900 pb-1.5"><span class="text-slate-400">Dirección:</span> <span class="font-semibold text-white">{{ orderResult.shippingAddress }}, {{ orderResult.communeName }}</span></div>
+        <div class="flex justify-between border-b border-slate-900 pb-1.5"><span class="text-slate-400">Medio de Pago:</span> <span class="font-semibold text-orange-500">{{ orderResult.paymentMethodName }}</span></div>
+        <div class="flex justify-between border-b border-slate-900 pb-1.5"><span class="text-slate-400">Código Transacción:</span> <span class="font-semibold text-white">{{ orderResult.transactionId }}</span></div>
+        <div class="flex justify-between"><span class="text-slate-400 font-bold">Total Pagado:</span> <span class="font-bold text-orange-400 text-sm">${{ orderResult.total.toFixed(2) }}</span></div>
       </div>
 
       <NuxtLink
@@ -110,22 +167,31 @@ const handleCheckout = () => {
       </div>
 
       <!-- Stepper Header -->
-      <div class="flex items-center space-x-4 mb-8 text-xs max-w-lg">
+      <div class="flex items-center space-x-4 mb-8 text-[11px] md:text-xs max-w-2xl">
         <div 
           @click="currentStep = 1"
           class="flex items-center space-x-2 cursor-pointer transition-colors duration-200"
           :class="currentStep === 1 ? 'text-orange-500 font-bold' : 'text-slate-400 hover:text-slate-200'"
         >
-          <span class="w-6 h-6 rounded-full flex items-center justify-center border font-semibold" :class="currentStep === 1 ? 'border-orange-500 bg-orange-500/10' : 'border-slate-800 bg-slate-950'">1</span>
-          <span>Revisión de Productos</span>
+          <span class="w-5 h-5 rounded-full flex items-center justify-center border font-semibold" :class="currentStep === 1 ? 'border-orange-500 bg-orange-500/10' : 'border-slate-800 bg-slate-950'">1</span>
+          <span>Productos</span>
+        </div>
+        <div class="h-px bg-slate-900 flex-grow"></div>
+        <div 
+          @click="currentStep = (checkoutForm.name && checkoutForm.email && checkoutForm.address && checkoutForm.communeId) ? 2 : 1"
+          class="flex items-center space-x-2 cursor-pointer transition-colors duration-200"
+          :class="currentStep === 2 ? 'text-orange-500 font-bold' : 'text-slate-400 hover:text-slate-200'"
+        >
+          <span class="w-5 h-5 rounded-full flex items-center justify-center border font-semibold" :class="currentStep === 2 ? 'border-orange-500 bg-orange-500/10' : 'border-slate-800 bg-slate-950'">2</span>
+          <span>Despacho</span>
         </div>
         <div class="h-px bg-slate-900 flex-grow"></div>
         <div 
           class="flex items-center space-x-2 transition-colors duration-200"
-          :class="currentStep === 2 ? 'text-orange-500 font-bold' : 'text-slate-500'"
+          :class="currentStep === 3 ? 'text-orange-500 font-bold' : 'text-slate-500'"
         >
-          <span class="w-6 h-6 rounded-full flex items-center justify-center border font-semibold" :class="currentStep === 2 ? 'border-orange-500 bg-orange-500/10' : 'border-slate-800 bg-slate-950'">2</span>
-          <span>Datos de Despacho</span>
+          <span class="w-5 h-5 rounded-full flex items-center justify-center border font-semibold" :class="currentStep === 3 ? 'border-orange-500 bg-orange-500/10' : 'border-slate-800 bg-slate-950'">3</span>
+          <span>Pago</span>
         </div>
       </div>
 
@@ -244,7 +310,7 @@ const handleCheckout = () => {
           <!-- Step 2: Shipping Form -->
           <div v-if="currentStep === 2" class="glassmorphism p-6 rounded-2xl border border-slate-900 space-y-4">
             <h3 class="text-sm font-semibold uppercase tracking-wider text-slate-200">Detalles de Envío y Facturación</h3>
-            <form @submit.prevent="handleCheckout" class="space-y-4 text-xs">
+            <form @submit.prevent="currentStep = 3" class="space-y-4 text-xs">
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="space-y-1.5">
                   <label class="text-slate-400 font-medium">Nombre Completo</label>
@@ -308,6 +374,58 @@ const handleCheckout = () => {
                   class="w-full sm:w-1/3 bg-slate-900 border border-slate-800 text-slate-400 hover:text-white rounded-xl py-3.5 transition-all text-xs font-semibold cursor-pointer text-center"
                 >
                   Volver al Carro
+                </button>
+                <button
+                  type="submit"
+                  class="w-full sm:w-2/3 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 text-white font-semibold rounded-xl py-3.5 shadow-lg shadow-orange-500/10 hover-lift transition-all flex items-center justify-center space-x-2 text-xs cursor-pointer"
+                >
+                  <span>Continuar al Pago</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-3.5 h-3.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+                  </svg>
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Step 3: Payment Method -->
+          <div v-if="currentStep === 3" class="glassmorphism p-6 rounded-2xl border border-slate-900 space-y-4">
+            <h3 class="text-sm font-semibold uppercase tracking-wider text-slate-200">Selecciona Medio de Pago</h3>
+            <form @submit.prevent="handleCheckout" class="space-y-6 text-xs">
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div
+                  v-for="method in paymentMethods"
+                  :key="method.id"
+                  @click="selectedPaymentMethodId = method.id"
+                  class="border rounded-2xl p-5 flex flex-col items-center justify-center gap-3 cursor-pointer transition-all duration-200 relative overflow-hidden"
+                  :class="Number(selectedPaymentMethodId) === Number(method.id) 
+                    ? 'border-orange-500 bg-orange-500/5 shadow-lg shadow-orange-500/5' 
+                    : 'border-slate-800 bg-slate-950/50 hover:border-slate-700'"
+                >
+                  <div class="absolute top-3 right-3 w-4 h-4 rounded-full border flex items-center justify-center" :class="Number(selectedPaymentMethodId) === Number(method.id) ? 'border-orange-500 bg-orange-500' : 'border-slate-700'">
+                    <div v-if="Number(selectedPaymentMethodId) === Number(method.id)" class="w-1.5 h-1.5 rounded-full bg-white"></div>
+                  </div>
+
+                  <div class="h-14 w-full flex items-center justify-center bg-white rounded-xl p-2.5 border border-slate-800 shadow-inner">
+                    <img v-if="method.logo" :src="method.logo" :alt="method.name" class="h-full max-w-full object-contain" />
+                    <span v-else class="text-slate-900 font-bold uppercase text-xs">{{ method.name }}</span>
+                  </div>
+
+                  <div class="text-center">
+                    <p class="font-bold text-white text-xs">{{ method.name }}</p>
+                    <p class="text-[10px] text-slate-400 mt-0.5">Pago seguro simulado</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- CTA Buttons -->
+              <div class="flex flex-col sm:flex-row items-center gap-4 pt-4">
+                <button
+                  type="button"
+                  @click="currentStep = 2"
+                  class="w-full sm:w-1/3 bg-slate-900 border border-slate-800 text-slate-400 hover:text-white rounded-xl py-3.5 transition-all text-xs font-semibold cursor-pointer text-center"
+                >
+                  Volver al Despacho
                 </button>
                 <button
                   type="submit"
