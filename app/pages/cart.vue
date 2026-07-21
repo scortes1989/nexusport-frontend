@@ -13,6 +13,7 @@ interface Commune {
   id: number;
   name: string;
   shippingPrice: number;
+  daysToDeliver: number;
 }
 
 const communes = ref<Commune[]>([]);
@@ -26,7 +27,6 @@ interface PaymentMethod {
 
 const paymentMethods = ref<PaymentMethod[]>([]);
 const selectedPaymentMethodId = ref<number | string>('');
-const orderResult = ref<any>(null);
 
 const sessionId = useCookie<string>('nexusport_session_id');
 
@@ -74,7 +74,7 @@ const selectedCommune = computed(() => {
 
 // Shipping Calculation: Free above $150, else dynamic based on selected commune
 const shippingCost = computed(() => {
-  if (cartTotalPrice.value >= 150 || cartTotalPrice.value === 0) {
+  if (cartTotalPrice.value === 0) {
     return 0;
   }
   return selectedCommune.value ? selectedCommune.value.shippingPrice : 0;
@@ -85,8 +85,6 @@ const cartFinalTotal = computed(() => {
 });
 
 const checkoutLoading = ref(false);
-const orderPlaced = ref(false);
-const orderId = ref('');
 
 const handleCheckout = async () => {
   if (cart.value.length === 0) return;
@@ -98,7 +96,7 @@ const handleCheckout = async () => {
   checkoutLoading.value = true;
   
   try {
-    const res = await $fetch<{ data: any }>('http://127.0.0.1:8000/api/checkout', {
+    const res = await $fetch<{ data: any }>('http://127.0.0.1:8000/api/orders', {
       method: 'POST',
       headers: {
         'X-Session-ID': sessionId.value || ''
@@ -113,10 +111,8 @@ const handleCheckout = async () => {
     });
 
     if (res && res.data) {
-      orderResult.value = res.data;
-      orderId.value = res.data.id;
-      orderPlaced.value = true;
       clearCart();
+      await navigateTo(`/orders/${res.data.code}?success=true`);
     }
   } catch (e: any) {
     console.error("Error during checkout API submission", e);
@@ -133,33 +129,7 @@ const handleCheckout = async () => {
     <!-- Background glows -->
     <div class="absolute top-[20%] left-[-5%] w-[400px] h-[400px] bg-orange-500/5 rounded-full blur-[100px] pointer-events-none"></div>
 
-    <div v-if="orderPlaced" class="max-w-xl mx-auto glassmorphism rounded-3xl p-8 lg:p-12 text-center border border-slate-900 space-y-6">
-      <div class="w-20 h-20 rounded-full bg-orange-600/10 border border-orange-500/30 flex items-center justify-center text-orange-400 mx-auto text-3xl animate-bounce-short">
-        ✓
-      </div>
-      <h1 class="text-3xl font-bold text-white">¡Compra Completada!</h1>
-      <p class="text-xs text-slate-400 leading-relaxed">
-        Muchas gracias por tu compra. Tu pedido ha sido procesado de manera exitosa y está en preparación para ser despachado.
-      </p>
-      
-      <div v-if="orderResult" class="bg-slate-950 border border-slate-900 rounded-2xl p-5 text-left space-y-2.5 text-xs text-slate-300">
-        <div class="flex justify-between border-b border-slate-900 pb-1.5"><span class="text-slate-400">ID del Pedido:</span> <span class="font-semibold text-white">#{{ orderId }}</span></div>
-        <div class="flex justify-between border-b border-slate-900 pb-1.5"><span class="text-slate-400">Destinatario:</span> <span class="font-semibold text-white">{{ orderResult.customerName }}</span></div>
-        <div class="flex justify-between border-b border-slate-900 pb-1.5"><span class="text-slate-400">Dirección:</span> <span class="font-semibold text-white">{{ orderResult.shippingAddress }}, {{ orderResult.communeName }}</span></div>
-        <div class="flex justify-between border-b border-slate-900 pb-1.5"><span class="text-slate-400">Medio de Pago:</span> <span class="font-semibold text-orange-500">{{ orderResult.paymentMethodName }}</span></div>
-        <div class="flex justify-between border-b border-slate-900 pb-1.5"><span class="text-slate-400">Código Transacción:</span> <span class="font-semibold text-white">{{ orderResult.transactionId }}</span></div>
-        <div class="flex justify-between"><span class="text-slate-400 font-bold">Total Pagado:</span> <span class="font-bold text-orange-400 text-sm">${{ orderResult.total.toFixed(2) }}</span></div>
-      </div>
 
-      <NuxtLink
-        to="/categories"
-        class="block w-full bg-orange-600 hover:bg-orange-500 text-white font-semibold rounded-xl py-3 text-xs hover-lift transition-all cursor-pointer"
-      >
-        Seguir Comprando
-      </NuxtLink>
-    </div>
-
-    <div v-else>
       <!-- Title -->
       <div class="space-y-4 mb-12">
         <h1 class="text-4xl font-bold tracking-tight text-white">Tu Carrito</h1>
@@ -451,14 +421,16 @@ const handleCheckout = async () => {
               
               <div class="flex justify-between">
                 <span class="text-slate-400">Envío:</span>
-                <span class="font-semibold text-emerald-400 uppercase" v-if="cartTotalPrice >= 150">¡Gratis!</span>
-                <span class="text-slate-500 italic" v-else-if="currentStep === 1">Calculado en paso 2</span>
+                <span class="text-slate-500 italic" v-if="currentStep === 1">Calculado en paso 2</span>
                 <span class="font-medium text-white" v-else-if="selectedCommune">${{ shippingCost.toFixed(2) }}</span>
                 <span class="text-slate-500 italic" v-else>Selecciona comuna</span>
               </div>
-              
-              <div v-if="shippingCost > 0 && cartTotalPrice < 150" class="text-[10px] text-orange-400">
-                Añade ${{ (150 - cartTotalPrice).toFixed(2) }} más para envío gratis.
+
+              <div v-if="selectedCommune && currentStep > 1" class="flex justify-between text-[10px] text-orange-400 pt-0.5">
+                <span>Plazo estimado:</span>
+                <span class="font-semibold">
+                  {{ selectedCommune.daysToDeliver === 0 ? 'Entrega hoy' : (selectedCommune.daysToDeliver === 1 ? 'Entrega mañana' : `Entrega en ${selectedCommune.daysToDeliver} días hábiles`) }}
+                </span>
               </div>
               
               <hr class="border-slate-900 my-2" />
@@ -492,7 +464,6 @@ const handleCheckout = async () => {
           Explorar Colección
         </NuxtLink>
       </div>
-    </div>
   </div>
 </template>
 

@@ -71,10 +71,31 @@ const filteredProducts = computed(() => {
 
 const toastMessage = ref('');
 const showToast = ref(false);
+const selectedSizes = ref<Record<string, string>>({});
+
+const getSelectedSizeForProduct = (product: any) => {
+  if (selectedSizes.value[product.id]) {
+    return selectedSizes.value[product.id];
+  }
+  if (!product.sizes || product.sizes.length === 0) {
+    return '';
+  }
+  const availableSize = product.sizes.find((s: any) => s.stock > 0);
+  return availableSize ? availableSize.size : (product.sizes[0]?.size || '');
+};
 
 const handleAddToCart = (product: any) => {
-  addToCart(product);
-  toastMessage.value = `¡${product.name} agregado al carrito!`;
+  const chosenSize = getSelectedSizeForProduct(product);
+  if (!chosenSize) {
+    toastMessage.value = `El producto no tiene tallas con stock disponible.`;
+    showToast.value = true;
+    setTimeout(() => {
+      showToast.value = false;
+    }, 3000);
+    return;
+  }
+  addToCart(product, chosenSize);
+  toastMessage.value = `¡${product.name} (Talla ${chosenSize}) agregado al carrito!`;
   showToast.value = true;
   setTimeout(() => {
     showToast.value = false;
@@ -220,6 +241,27 @@ const handleAddToCart = (product: any) => {
                   </h3>
                 </NuxtLink>
                 <p class="text-xs text-slate-400 line-clamp-2">{{ product.description }}</p>
+
+                <!-- Tallas interactivas -->
+                <div v-if="product.sizes && product.sizes.length > 0" class="pt-3 space-y-1.5">
+                  <p class="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Talla</p>
+                  <div class="flex flex-wrap gap-1.5">
+                    <button
+                      v-for="s in product.sizes"
+                      :key="s.size"
+                      :disabled="s.stock <= 0"
+                      @click="selectedSizes[product.id] = s.size"
+                      class="h-7 min-w-[28px] px-1.5 text-[10px] rounded-lg border font-semibold flex items-center justify-center transition-all cursor-pointer"
+                      :class="getSelectedSizeForProduct(product) === s.size
+                        ? 'border-orange-500 bg-orange-500/10 text-orange-400 font-bold'
+                        : s.stock <= 0 
+                          ? 'border-slate-900 bg-slate-950 text-slate-600 line-through cursor-not-allowed'
+                          : 'border-slate-800 bg-slate-950/40 text-slate-400 hover:border-slate-700 hover:text-slate-200'"
+                    >
+                      {{ s.size }}
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <!-- Buy Action -->
